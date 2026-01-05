@@ -1,0 +1,98 @@
+# ---------------- FIREWALL RULES ----------------
+BLOCKED_IPS = []
+BLOCKED_PORTS = [22]
+ALLOWED_PROTOCOLS = ["TCP", "HTTP"]
+
+# IDS parameters
+MAX_REQUESTS = 5   # threshold for suspicious activity
+
+# Traffic counter per IP
+traffic_counter = {}
+
+
+# ---------------- FIREWALL ----------------
+def firewall(packet):
+    src_ip = packet["src_ip"]
+    port = packet["port"]
+    protocol = packet["protocol"]
+
+    if src_ip in BLOCKED_IPS:
+        return "BLOCKED by Firewall: IP blacklisted"
+
+    if port in BLOCKED_PORTS:
+        return "BLOCKED by Firewall: Port not allowed"
+
+    if protocol not in ALLOWED_PROTOCOLS:
+        return "BLOCKED by Firewall: Protocol not allowed"
+
+    return "ALLOWED by Firewall"
+
+
+# ---------------- IDS ----------------
+def ids(packet):
+    src_ip = packet["src_ip"]
+
+    if src_ip not in traffic_counter:
+        traffic_counter[src_ip] = 1
+    else:
+        traffic_counter[src_ip] += 1
+
+    if traffic_counter[src_ip] > MAX_REQUESTS:
+        return f"IDS ALERT: Suspicious activity detected from {src_ip}"
+
+    return "IDS: Normal traffic"
+
+
+# ---------------- IPS ----------------
+def ips(packet):
+    src_ip = packet["src_ip"]
+
+    alert = ids(packet)
+    if "ALERT" in alert:
+        if src_ip not in BLOCKED_IPS:
+            BLOCKED_IPS.append(src_ip)
+        return f"IPS ACTION: IP {src_ip} blocked"
+
+    return "IPS: No action"
+
+
+# ---------------- TRAFFIC GENERATOR ----------------
+def generate_normal_traffic():
+    return [
+        {"src_ip": "192.168.1.2", "port": 80, "protocol": "HTTP"},
+        {"src_ip": "192.168.1.3", "port": 443, "protocol": "TCP"},
+        {"src_ip": "192.168.1.4", "port": 80, "protocol": "HTTP"}
+    ]
+
+
+def generate_malicious_traffic():
+    traffic = []
+    for _ in range(7):  # flooding from same IP
+        traffic.append(
+            {"src_ip": "10.0.0.5", "port": 80, "protocol": "HTTP"}
+        )
+    return traffic
+
+
+# ---------------- SIMULATION ----------------
+def simulate(traffic):
+    for packet in traffic:
+        print("\nPacket:", packet)
+
+        fw_result = firewall(packet)
+        print(fw_result)
+
+        if "ALLOWED" in fw_result:
+            ids_result = ids(packet)
+            print(ids_result)
+
+            ips_result = ips(packet)
+            print(ips_result)
+
+
+# ---------------- MAIN ----------------
+print("---- Normal Traffic Simulation ----")
+simulate(generate_normal_traffic())
+
+print("\n---- Malicious Traffic Simulation ----")
+simulate(generate_malicious_traffic())
